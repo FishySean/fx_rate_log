@@ -24,10 +24,10 @@ c.execute('''
         bank TEXT,
         currency TEXT,
         rtbBid REAL,   -- 综合汇率
-        rtcBid REAL,   -- 现汇买入价
-        rtcOfr REAL,   -- 现钞买入价
+        rthBid REAL,   -- 现汇买入价
+        rtcBid REAL,   -- 现钞买入价
         rthOfr REAL,   -- 现汇卖出价
-        rtbOfr REAL,   -- 现钞卖出价
+        rtcOfr REAL,   -- 现钞卖出价
         ratTim TEXT,   -- 时间
         ratDat TEXT,   -- 日期
         UNIQUE(bank, ratTim, ratDat)
@@ -56,7 +56,7 @@ def fetch_cmb_rate():
         
         # 获取数据库中的最新记录
         c.execute('''
-            SELECT rtbBid, rtcBid, rtcOfr, rthOfr, rtbOfr FROM rates
+            SELECT rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
             WHERE bank='CMB' AND currency='USD'
             ORDER BY ratDat DESC, ratTim DESC LIMIT 1
         ''')
@@ -73,7 +73,7 @@ def fetch_cmb_rate():
         
         # 插入数据时，按照招商银行的汇率结构来映射字段
         c.execute('''
-            INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rtcBid, rtcOfr, rthOfr, rtbOfr, ratTim, ratDat)
+            INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr, ratTim, ratDat)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             "CMB", 
@@ -107,7 +107,7 @@ def fetch_boc_rate():
         
         # 获取数据库中的最新记录
         c.execute('''
-            SELECT rtbBid, rtcBid, rtcOfr, rthOfr, rtbOfr FROM rates
+            SELECT rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
             WHERE bank='BOC' AND currency='USD'
             ORDER BY ratDat DESC, ratTim DESC LIMIT 1
         ''')
@@ -124,7 +124,7 @@ def fetch_boc_rate():
 
         # 插入数据时，按照中国银行的汇率结构来映射字段
         c.execute('''
-            INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rtcBid, rtcOfr, rthOfr, rtbOfr, ratTim, ratDat)
+            INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr, ratTim, ratDat)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             "BOC", 
@@ -153,7 +153,7 @@ def rates_data():
     try:
         # 查询汇率数据
         c.execute('''
-            SELECT bank, ratTim, rtbBid, rtcBid, rtcOfr, rthOfr, rtbOfr FROM rates
+            SELECT bank, ratTim, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
             WHERE currency='USD'
             ORDER BY ratDat, ratTim
         ''')
@@ -162,30 +162,30 @@ def rates_data():
         # 整理数据
         times = [f"{row[1]}" for row in data]
         cmb_rtbBid = [row[2] for row in data if row[0] == 'CMB']
-        cmb_rtcBid = [row[3] for row in data if row[0] == 'CMB']
-        cmb_rtcOfr = [row[4] for row in data if row[0] == 'CMB']
+        cmb_rthBid = [row[3] for row in data if row[0] == 'CMB']
+        cmb_rtcBid = [row[4] for row in data if row[0] == 'CMB']
         cmb_rthOfr = [row[5] for row in data if row[0] == 'CMB']
-        cmb_rtbOfr = [row[6] for row in data if row[0] == 'CMB']
+        cmb_rtcOfr = [row[6] for row in data if row[0] == 'CMB']
 
         boc_rtbBid = [row[2] for row in data if row[0] == 'BOC']
-        boc_rtcBid = [row[3] for row in data if row[0] == 'BOC']
-        boc_rtcOfr = [row[4] for row in data if row[0] == 'BOC']
+        boc_rthBid = [row[3] for row in data if row[0] == 'BOC']
+        boc_rtcBid = [row[4] for row in data if row[0] == 'BOC']
         boc_rthOfr = [row[5] for row in data if row[0] == 'BOC']
-        boc_rtbOfr = [row[6] for row in data if row[0] == 'BOC']
+        boc_rtcOfr = [row[6] for row in data if row[0] == 'BOC']
 
         # 返回JSON数据供前端使用
         return jsonify({
             'times': times,
             'cmb_rtbBid': cmb_rtbBid,
+            'cmb_rthBid': cmb_rthBid,
             'cmb_rtcBid': cmb_rtcBid,
-            'cmb_rtcOfr': cmb_rtcOfr,
             'cmb_rthOfr': cmb_rthOfr,
-            'cmb_rtbOfr': cmb_rtbOfr,
+            'cmb_rtcOfr': cmb_rtcOfr,
             'boc_rtbBid': boc_rtbBid,
+            'boc_rthBid': boc_rthBid,
             'boc_rtcBid': boc_rtcBid,
-            'boc_rtcOfr': boc_rtcOfr,
             'boc_rthOfr': boc_rthOfr,
-            'boc_rtbOfr': boc_rtbOfr
+            'boc_rtcOfr': boc_rtcOfr
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
