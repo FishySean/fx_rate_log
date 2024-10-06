@@ -1,53 +1,53 @@
-# 人民币/美元汇率比较工具
+# CNY/USD Exchange Rate Comparison Tool
 
-这个项目是一个用于比较中国银行和招商银行人民币/美元汇率的Web应用。
+This project is a web application designed to compare the CNY/USD exchange rates offered by the Bank of China (BOC) and China Merchants Bank (CMB).
 
-## 功能特点
+## Features
 
-- 实时抓取中国银行和招商银行的人民币/美元汇率数据
-- 将汇率数据存储在SQLite数据库中
-- 通过Web界面展示汇率数据的折线图
-- 支持多种汇率类型的比较（如现汇买入价、现钞卖出价等）
+- Real-time fetching of CNY/USD exchange rate data from BOC and CMB
+- Stores exchange rate data in an SQLite database
+- Displays exchange rate data in a line chart through a web interface
+- Supports comparison of various rate types (e.g., telegraphic transfer buying rate, cash selling rate, etc.)
 
-## 技术栈
+## Tech Stack
 
-- 后端：Python, Flask
-- 数据库：SQLite
-- 前端：HTML, JavaScript, Chart.js
-- 数据抓取：requests, bocfx库
+- Backend: Python, Flask
+- Database: SQLite
+- Frontend: HTML, JavaScript, Chart.js
+- Data Scraping: requests, bocfx library
 
-## 安装和运行
+## Installation and Running
 
-1. 克隆仓库：
+1. Clone the repository:
    ```
-   git clone [仓库URL]
+   git clone [repository URL]
    ```
 
-2. 安装依赖：
+2. Install dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-3. 运行应用：
+3. Run the application:
    ```
    python main.py
    ```
 
-4. 在浏览器中访问 `http://127.0.0.1:8881` 查看应用
+4. Access the application in your browser at `http://127.0.0.1:8881`
 
-## 项目结构
+## Project Structure
 
-- `main.py`: 主应用文件，包含Flask应用和数据抓取逻辑
-- `templates/index.html`: 前端页面模板
-- `exchange_rates.db`: SQLite数据库文件
-- `exchange_rates.log`: 日志文件
+- `main.py`: The main application file containing Flask and data scraping logic
+- `templates/index.html`: The frontend HTML template
+- `exchange_rates.db`: SQLite database file
+- `exchange_rates.log`: Log file
 
-## 注意事项
+## Notes
 
-- 确保您的网络环境能够访问中国银行和招商银行的官方网站
-- 本应用每分钟更新一次汇率数据
-- 请遵守相关网站的使用条款和政策
+- Ensure that your network allows access to the official websites of the Bank of China and China Merchants Bank
+- The application updates the exchange rate data every minute
+- Please follow the terms and policies of the relevant websites
 
-## 贡献
+## Contributions
 
-欢迎提交问题和拉取请求。对于重大更改，请先开issue讨论您想要改变的内容。
+Feel free to submit issues and pull requests. For major changes, please open an issue first to discuss what you would like to change.

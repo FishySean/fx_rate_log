@@ -6,7 +6,7 @@ import logging
 from flask import Flask, jsonify, render_template
 import sys
 
-# 初始化日志系统
+# Initialize logging system
 logging.basicConfig(filename='exchange_rates.log', level=logging.DEBUG,
                     format='%(asctime)s %(levelname)s:%(message)s')
 
@@ -16,20 +16,20 @@ console_formatter = logging.Formatter('%(asctime)s %(levelname)s:%(message)s')
 console_handler.setFormatter(console_formatter)
 logging.getLogger('').addHandler(console_handler)
 
-# 初始化数据库
+# Initialize database
 conn = sqlite3.connect('exchange_rates.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('''
     CREATE TABLE IF NOT EXISTS rates (
         bank TEXT,
         currency TEXT,
-        rtbBid REAL,   -- 综合汇率
-        rthBid REAL,   -- 现汇买入价
-        rtcBid REAL,   -- 现钞买入价
-        rthOfr REAL,   -- 现汇卖出价
-        rtcOfr REAL,   -- 现钞卖出价
-        ratTim TEXT,   -- 时间
-        ratDat TEXT,   -- 日期
+        rtbBid REAL,   -- Composite rate
+        rthBid REAL,   -- Telegraphic transfer buying rate
+        rtcBid REAL,   -- Cash buying rate
+        rthOfr REAL,   -- Telegraphic transfer selling rate
+        rtcOfr REAL,   -- Cash selling rate
+        ratTim TEXT,   -- Time
+        ratDat TEXT,   -- Date
         UNIQUE(bank, ratTim, ratDat)
     )
 ''')
@@ -44,17 +44,18 @@ def fetch_cmb_rate():
         data = response.json()
         rate_info = data["body"]["data"][0]
         
-        ratDat = rate_info["ratDat"]
-        ratTim = rate_info["ratTim"]
+        ratDat_unformmated = rate_info["ratDat"]
+        ratDat = ratDat_unformmated.replace('年', '-').replace('月', '-').replace('日', '')  # Format date
+        ratTim = rate_info["ratTim"]  # Time
+
+        # Parse CMB's five exchange rates in correct order
+        rtbBid = float(rate_info['rtbBid'])    # Composite rate
+        rthBid = float(rate_info['rthBid'])    # Telegraphic transfer buying rate
+        rtcBid = float(rate_info['rtcBid'])    # Cash buying rate
+        rthOfr = float(rate_info['rthOfr'])    # Telegraphic transfer selling rate
+        rtcOfr = float(rate_info['rtcOfr'])    # Cash selling rate
         
-        # 按照正确的顺序解析招商银行的五个汇率
-        rtbBid = float(rate_info['rtbBid'])    # 综合汇率
-        rthBid = float(rate_info['rthBid'])    # 现汇买入价
-        rtcBid = float(rate_info['rtcBid'])    # 现钞买入价
-        rthOfr = float(rate_info['rthOfr'])    # 现汇卖出价
-        rtcOfr = float(rate_info['rtcOfr'])    # 现钞卖出价
-        
-        # 获取数据库中的最新记录
+        # Fetch the latest record from the database
         c.execute('''
             SELECT rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
             WHERE bank='CMB' AND currency='USD'
@@ -62,16 +63,16 @@ def fetch_cmb_rate():
         ''')
         latest_rate = c.fetchone()
 
-        # 将数据库中的汇率值转换为 float 进行比较
+        # Convert the rates in the database to float for comparison
         if latest_rate:
-            latest_rate = tuple(map(float, latest_rate))  # 将数据库中的值转换为 float
+            latest_rate = tuple(map(float, latest_rate))  # Convert values to float
         
-        # 检查汇率是否和最新记录相同
+        # Check if the rate is the same as the latest record
         if latest_rate and (rtbBid, rthBid, rtcBid, rthOfr, rtcOfr) == latest_rate:
-            logging.info("招商银行汇率未更新，跳过插入操作。")
+            logging.info("CMB exchange rate has not been updated, skipping insert operation.")
             return
         
-        # 插入数据时，按照招商银行的汇率结构来映射字段
+        # Insert data into the database, mapping fields to CMB rate structure
         c.execute('''
             INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr, ratTim, ratDat)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -87,25 +88,25 @@ def fetch_cmb_rate():
             ratDat
         ))
         conn.commit()
-        logging.info(f"招商银行 汇率数据 - 综合汇率：{rtbBid} 现汇卖出价：{rthOfr} 现钞卖出价：{rtcOfr} 现汇买入价：{rthBid} 现钞买入价：{rtcBid}")
+        logging.info(f"CMB Exchange Rate Data - Composite Rate: {rtbBid} TT Selling Rate: {rthOfr} Cash Selling Rate: {rtcOfr} TT Buying Rate: {rthBid} Cash Buying Rate: {rtcBid}")
     except Exception as e:
-        logging.error(f"获取或存储招商银行汇率失败: {e}")
+        logging.error(f"Failed to fetch or store CMB exchange rate: {e}")
 
 def fetch_boc_rate():
     try:
         boc_data = bocfx.bocfx('USD')[1]
         
-        ratTim = boc_data[-1]  # 最后一个元素是时间
-        ratDat = ratTim.split(" ")[0]  # 时间中的日期部分
+        ratTim = boc_data[-1]  # Last element is the time
+        ratDat = ratTim.split(" ")[0]  # Extract the date part from time
         
-        # BOC 汇率解析顺序：
-        rthBid = float(boc_data[1])  # 现汇买入价
-        rtcBid = float(boc_data[2])  # 现钞买入价
-        rthOfr = float(boc_data[3])  # 现汇卖出价
-        rtcOfr = float(boc_data[4])  # 现钞卖出价
-        rtbBid = float(boc_data[5])  # 折算价（即综合汇率）
+        # BOC rate parsing order:
+        rthBid = float(boc_data[1])  # TT Buying Rate
+        rtcBid = float(boc_data[2])  # Cash Buying Rate
+        rthOfr = float(boc_data[3])  # TT Selling Rate
+        rtcOfr = float(boc_data[4])  # Cash Selling Rate
+        rtbBid = float(boc_data[5])  # Conversion Rate (Composite Rate)
         
-        # 获取数据库中的最新记录
+        # Fetch the latest record from the database
         c.execute('''
             SELECT rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
             WHERE bank='BOC' AND currency='USD'
@@ -113,16 +114,16 @@ def fetch_boc_rate():
         ''')
         latest_rate = c.fetchone()
 
-        # 将数据库中的汇率值转换为 float 进行比较
+        # Convert the rates in the database to float for comparison
         if latest_rate:
-            latest_rate = tuple(map(float, latest_rate))  # 将数据库中的值转换为 float
+            latest_rate = tuple(map(float, latest_rate))  # Convert values to float
 
-        # 检查汇率是否和最新记录相同
+        # Check if the rate is the same as the latest record
         if latest_rate and (rtbBid, rthBid, rtcBid, rthOfr, rtcOfr) == latest_rate:
-            logging.info("中国银行汇率未更新，跳过插入操作。")
+            logging.info("BOC exchange rate has not been updated, skipping insert operation.")
             return
 
-        # 插入数据时，按照中国银行的汇率结构来映射字段
+        # Insert data into the database, mapping fields to BOC rate structure
         c.execute('''
             INSERT OR IGNORE INTO rates (bank, currency, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr, ratTim, ratDat)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -134,13 +135,13 @@ def fetch_boc_rate():
             rtcBid, 
             rthOfr, 
             rtcOfr,
-            ratTim.split(" ")[1],  # 仅获取时间部分
+            ratTim.split(" ")[1],  # Only get the time part
             ratDat
         ))
         conn.commit()
-        logging.info(f"中国银行 汇率数据 - 综合汇率：{rtbBid} 现汇卖出价：{rthOfr} 现钞卖出价：{rtcOfr} 现汇买入价：{rthBid} 现钞买入价：{rtcBid}")
+        logging.info(f"BOC Exchange Rate Data - Composite Rate: {rtbBid} TT Selling Rate: {rthOfr} Cash Selling Rate: {rtcOfr} TT Buying Rate: {rthBid} Cash Buying Rate: {rtcBid}")
     except Exception as e:
-        logging.error(f"获取或存储中国银行汇率失败: {e}")
+        logging.error(f"Failed to fetch or store BOC exchange rate: {e}")
 
 
 
@@ -151,73 +152,65 @@ def index():
 @app.route('/rates_data')
 def rates_data():
     try:
-        # 查询招商银行汇率数据
+        # Query all bank data with currency='USD' from the database
         c.execute('''
-            SELECT ratTim, ratDat, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
-            WHERE currency='USD' AND bank='CMB'
+            SELECT bank, ratTim, ratDat, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
+            WHERE currency='USD'
             ORDER BY ratDat, ratTim
         ''')
-        cmb_data = c.fetchall()
+        all_data = c.fetchall()
 
-        # 查询中国银行汇率数据
-        c.execute('''
-            SELECT ratTim, ratDat, rtbBid, rthBid, rtcBid, rthOfr, rtcOfr FROM rates
-            WHERE currency='USD' AND bank='BOC'
-            ORDER BY ratDat, ratTim
-        ''')
-        boc_data = c.fetchall()
+        # Create a dictionary to store data for all banks
+        banks_data = {}
 
-        # 整理数据，分别为CMB和BOC的数据和时间
-        cmb_times = [f"{row[1]} {row[0]}" for row in cmb_data]
-        cmb_rtbBid = [row[2] for row in cmb_data]
-        cmb_rthBid = [row[3] for row in cmb_data]
-        cmb_rtcBid = [row[4] for row in cmb_data]
-        cmb_rthOfr = [row[5] for row in cmb_data]
-        cmb_rtcOfr = [row[6] for row in cmb_data]
+        # Iterate over the query results and organize data by bank
+        for row in all_data:
+            bank = row[0]  # Get the bank name
+            timestamp = f"{row[2]} {row[1]}"  # Combine date and time
+            rtbBid = row[3]  # Composite rate
+            rthBid = row[4]  # TT Buying Rate
+            rtcBid = row[5]  # Cash Buying Rate
+            rthOfr = row[6]  # TT Selling Rate
+            rtcOfr = row[7]  # Cash Selling Rate
 
-        boc_times = [f"{row[1]} {row[0]}" for row in boc_data]
-        boc_rtbBid = [row[2] for row in boc_data]
-        boc_rthBid = [row[3] for row in boc_data]
-        boc_rtcBid = [row[4] for row in boc_data]
-        boc_rthOfr = [row[5] for row in boc_data]
-        boc_rtcOfr = [row[6] for row in boc_data]
+            # If the bank is not already in banks_data, create a new entry
+            if bank not in banks_data:
+                banks_data[bank] = {
+                    'times': [],
+                    'rtbBid': [],
+                    'rthBid': [],
+                    'rtcBid': [],
+                    'rthOfr': [],
+                    'rtcOfr': []
+                }
 
-        # 返回JSON数据供前端使用
-        return jsonify({
-            'cmb': {
-                'times': cmb_times,
-                'rtbBid': cmb_rtbBid,
-                'rthBid': cmb_rthBid,
-                'rtcBid': cmb_rtcBid,
-                'rthOfr': cmb_rthOfr,
-                'rtcOfr': cmb_rtcOfr
-            },
-            'boc': {
-                'times': boc_times,
-                'rtbBid': boc_rtbBid,
-                'rthBid': boc_rthBid,
-                'rtcBid': boc_rtcBid,
-                'rthOfr': boc_rthOfr,
-                'rtcOfr': boc_rtcOfr
-            }
-        })
+            # Add data to the corresponding bank entry
+            banks_data[bank]['times'].append(timestamp)
+            banks_data[bank]['rtbBid'].append(rtbBid)
+            banks_data[bank]['rthBid'].append(rthBid)
+            banks_data[bank]['rtcBid'].append(rtcBid)
+            banks_data[bank]['rthOfr'].append(rthOfr)
+            banks_data[bank]['rtcOfr'].append(rtcOfr)
+
+        # Return JSON data for frontend use
+        return jsonify(banks_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     try:
-        logging.info("启动Flask应用...")
-        # 在后台运行数据抓取，每分钟执行一次
+        logging.info("Starting Flask application...")
+        # Run data collection in the background every minute
         import threading
         def data_collector():
             while True:
                 fetch_cmb_rate()
                 fetch_boc_rate()
-                time.sleep(60)  # 每分钟执行一次
+                time.sleep(60)  # Execute every minute
         collector_thread = threading.Thread(target=data_collector)
         collector_thread.daemon = True
         collector_thread.start()
         
         app.run(debug=False, host='100.126.221.127', port=8881)
     except Exception as e:
-        logging.critical(f"主程序执行中出现严重错误: {e}")
+        logging.critical(f"Critical error occurred in main program: {e}")
