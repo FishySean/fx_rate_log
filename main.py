@@ -4,7 +4,7 @@ import time
 import bocfx
 import logging
 from flask import Flask, jsonify, render_template
-import sys
+
 
 # Initialize logging system
 logging.basicConfig(filename='exchange_rates.log', level=logging.DEBUG,
